@@ -132,6 +132,9 @@ function init() {
     projects=JSON.parse(d);
     Object.values(projects).forEach(p=>{
       if(!p.framing) p.framing={context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:'',urlEspaceFormateur:''};
+      if(p.framing.urlEspaceFormateur === undefined) p.framing.urlEspaceFormateur = '';
+      // CORRECTION 1 : Migration pour les anciens projets sans URL à la racine
+      if(p.urlEspaceFormateur === undefined) p.urlEspaceFormateur = p.framing.urlEspaceFormateur || '';
     });
   } else {
     projects={[defaultProject.id]:defaultProject};
@@ -163,7 +166,7 @@ function openSelectedProject() {
 }
 function updateEspaceFormateurButton(project) {
   const btn = document.getElementById('btn-espace-formateur');
-  if (project.urlEspaceFormateur && project.urlEspaceFormateur.trim() !== "") {
+  if (project && project.urlEspaceFormateur && project.urlEspaceFormateur.trim() !== "") {
     btn.style.display = 'flex';
   } else {
     btn.style.display = 'none';
@@ -181,6 +184,12 @@ function togglePresentationMode() { document.body.classList.toggle('presentation
 
 function renderFraming() {
   const p=projects[currentProjectId],container=document.getElementById('framingContainer'),f=p.framing||{context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:'',urlEspaceFormateur:''};
+  
+  // CORRECTION 2 : Affichage du lien cliquable si l'URL existe
+  const urlHtml = f.urlEspaceFormateur 
+    ? `<a href="${f.urlEspaceFormateur}" target="_blank" style="color:var(--primary);text-decoration:underline;font-weight:bold;"><i class="fas fa-external-link-alt"></i> ${f.urlEspaceFormateur}</a>`
+    : 'Non renseigné';
+
   let html=`<div class="framing-header"><div><div class="framing-title">Fiche Formation</div><div class="framing-subtitle">Définition et périmètre de la formation</div></div>${!isFramingEditMode?`<button class="btn-action primary" onclick="toggleFramingEdit()"><i class="fas fa-pen"></i> Modifier</button>`:''}</div><div class="framing-grid">
     <div class="framing-block full-width"><div class="framing-label"><i class="fas fa-align-left"></i> Contexte & Public</div>${isFramingEditMode?`<textarea id="fContext" class="framing-textarea" rows="3">${f.context}</textarea>`:`<div class="framing-text ${!f.context?'empty':''}">${f.context||'Non renseigné'}</div>`}</div>
     <div class="framing-block"><div class="framing-label"><i class="fas fa-bullseye"></i> Objectifs Pédagogiques</div>${isFramingEditMode?`<textarea id="fObjectives" class="framing-textarea" rows="4">${f.objectives}</textarea>`:`<div class="framing-text ${!f.objectives?'empty':''}">${f.objectives||'Non renseigné'}</div>`}</div>
@@ -189,12 +198,11 @@ function renderFraming() {
     <div class="framing-block"><div class="framing-label"><i class="fas fa-chalkboard-user"></i> Formateur</div>${isFramingEditMode?`<input type="text" id="fTrainer" class="framing-input" value="${f.trainer}">`:`<div class="framing-text ${!f.trainer?'empty':''}">${f.trainer||'Non renseigné'}</div>`}</div>
     <div class="framing-block full-width"><div class="framing-label"><i class="fas fa-map-marker-alt"></i> Modalité</div>${isFramingEditMode?`<input type="text" id="fModality" class="framing-input" value="${f.modality}">`:`<div class="framing-text ${!f.modality?'empty':''}">${f.modality||'Non renseigné'}</div>`}</div>
     
-    <!-- NOUVEAU CHAMP ICI -->
     <div class="framing-block full-width">
       <div class="framing-label"><i class="fas fa-link"></i> Lien vers l'Espace Formateur (Vercel)</div>
       ${isFramingEditMode 
         ? `<input type="text" id="fUrlFormateur" class="framing-input" value="${f.urlEspaceFormateur || ''}" placeholder="https://...">` 
-        : `<div class="framing-text ${!f.urlEspaceFormateur ? 'empty' : ''}">${f.urlEspaceFormateur || 'Non renseigné'}</div>`}
+        : `<div class="framing-text ${!f.urlEspaceFormateur ? 'empty' : ''}">${urlHtml}</div>`}
     </div>
 
     </div>${isFramingEditMode?`<div class="framing-actions"><button class="btn-action" onclick="toggleFramingEdit()">Annuler</button><button class="btn-action primary" onclick="saveFraming()">Enregistrer</button></div>`:''}`;
@@ -205,7 +213,8 @@ function saveFraming() {
   const p = projects[currentProjectId];
   
   const urlInput = document.getElementById('fUrlFormateur');
-  const urlValue = urlInput ? urlInput.value : '';
+  // CORRECTION 3 : Ajout de trim() pour éviter les espaces vides
+  const urlValue = urlInput ? urlInput.value.trim() : '';
 
   p.framing = {
     context: document.getElementById('fContext').value,
@@ -217,7 +226,6 @@ function saveFraming() {
     urlEspaceFormateur: urlValue 
   };
   
-  // On met aussi à jour l'URL à la racine du projet pour le bouton
   p.urlEspaceFormateur = urlValue;
 
   saveData();
@@ -277,7 +285,31 @@ function buildTaskForm(task) {
 
 function openNewPhaseModal(){modalContext={type:'new_phase',taskId:null,phaseId:null};document.getElementById('modalTitle').textContent='Nouvelle phase';document.getElementById('modalDeleteContainer').style.display='none';buildPhaseForm(null);document.getElementById('modalOverlay').classList.add('open')}
 function openEditPhaseModal(pid){modalContext={type:'phase',taskId:null,phaseId:pid};const p=projects[currentProjectId],ph=p.phases.find(x=>x.id===pid);document.getElementById('modalTitle').textContent='Modifier la phase';document.getElementById('modalDeleteContainer').style.display='block';buildPhaseForm(ph);document.getElementById('modalOverlay').classList.add('open')}
-function buildPhaseForm(phase){const colors=['#7c4dff','#00afa9','#ffa900','#e91e63','#3f51b5','#096475'],cur=phase?phase.color:colors[0];let sw=colors.map(c=>`<label style="display:inline-block;margin-right:10px;cursor:pointer"><input type="radio" name="phaseColor" value="${c}" ${c===cur?'checked':''} style="display:none"><span style="display:inline-block;width:30px;height:30px;border-radius:50%;background:${c};border:2px solid ${c===cur?'#333':'transparent'}"></span></label>`).join('');let html=`<div class="form-group"><label>Nom de la phase</label><input type="text" id="mPhaseName" value="${phase?phase.name:''}" placeholder="Ex: Ingénierie"></div><div class="form-group"><label>Couleur</label><div>${sw}</div></div>`;document.getElementById('modalBody').innerHTML=html}
+
+// CORRECTION 4 : Ajout de l'événement onchange pour mettre à jour la bordure
+function buildPhaseForm(phase){
+  const colors=['#7c4dff','#00afa9','#ffa900','#e91e63','#3f51b5','#096475'],cur=phase?phase.color:colors[0];
+  
+  // NOUVELLE STRUCTURE : L'input radio est superposé sur le label pour capter le clic
+  let sw=colors.map(c=>`
+    <label style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:2px solid ${c===cur?'#333':'transparent'};cursor:pointer;margin-right:12px;position:relative;box-sizing:border-box;transition:border-color 0.2s;">
+      <input type="radio" name="phaseColor" value="${c}" ${c===cur?'checked':''} style="position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;margin:0;z-index:2;" onchange="updateColorSelection(this)">
+      <span style="display:block;width:24px;height:24px;border-radius:50%;background:${c};pointer-events:none;"></span>
+    </label>
+  `).join('');
+  
+  let html=`<div class="form-group"><label>Nom de la phase</label><input type="text" id="mPhaseName" value="${phase?phase.name:''}" placeholder="Ex: Ingénierie"></div><div class="form-group"><label>Couleur</label><div style="display:flex;align-items:center;margin-top:5px;">${sw}</div></div>`;
+  document.getElementById('modalBody').innerHTML=html;
+}
+
+// Met à jour la bordure noire sur le cercle sélectionné
+function updateColorSelection(input) {
+  document.querySelectorAll('input[name="phaseColor"]').forEach(r => {
+    // On applique la bordure sur le parent (le label)
+    r.parentElement.style.borderColor = r.checked ? '#333' : 'transparent';
+  });
+}
+
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open')}
 
 function saveModal() {
