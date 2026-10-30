@@ -104,15 +104,15 @@ let projects = {}, currentProjectId = null, modalContext = { type: null, taskId:
 
 const defaultProject = {
   id: 'train-2026', name: 'Formation Vente B2B', client: 'Connecteo Interne',
-   urlEspaceFormateur: "https://le-recouvrement.vercel.app/admin.html", // <-- AJOUT ICI
-  framing: {
+  urlEspaceFormateur: "https://le-recouvrement.vercel.app/admin.html", 
   framing: {
     context: "Formation destinée aux commerciaux juniors pour maîtriser les techniques de vente complexe.",
     objectives: "1. Maîtriser le cycle de vente.\n2. Savoir gérer les objections.\n3. Conclure une négociation.",
     thematic: "Vente & Négociation B2B",
     participants: "12 participants",
     trainer: "Jean Dupont (Formateur Senior)",
-    modality: "Présentiel - Paris"
+    modality: "Présentiel - Paris",
+    urlEspaceFormateur: "https://le-recouvrement.vercel.app/admin.html"
   },
   phases: [
     { id: 'p1', name: 'Ingénierie', color: '#7c4dff', tasks: [
@@ -126,7 +126,19 @@ const defaultProject = {
   ]
 };
 
-function init() { const d = localStorage.getItem(STORAGE_KEY); if(d){projects=JSON.parse(d);Object.values(projects).forEach(p=>{if(!p.framing)p.framing={context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:''}})}else{projects={[defaultProject.id]:defaultProject};saveData()} renderWelcome(); }
+function init() { 
+  const d = localStorage.getItem(STORAGE_KEY); 
+  if(d){
+    projects=JSON.parse(d);
+    Object.values(projects).forEach(p=>{
+      if(!p.framing) p.framing={context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:'',urlEspaceFormateur:''};
+    });
+  } else {
+    projects={[defaultProject.id]:defaultProject};
+    saveData();
+  } 
+  renderWelcome(); 
+}
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(projects)); }
 function getTodayISO() { return new Date().toISOString().split('T')[0]; }
 function parseDate(s) { const[y,m,d]=s.split('-');return new Date(y,m-1,d); }
@@ -145,12 +157,10 @@ function openSelectedProject() {
   document.getElementById('hdrProjectName').textContent = p.name;
   document.getElementById('hdrClientName').textContent = p.client || 'Client';
   
-  // NOUVEAU : Mise à jour de l'affichage du bouton Espace Formateur
   updateEspaceFormateurButton(p); 
   
   switchTab('roadmap');
 }
-// Met à jour le bouton à l'ouverture du projet
 function updateEspaceFormateurButton(project) {
   const btn = document.getElementById('btn-espace-formateur');
   if (project.urlEspaceFormateur && project.urlEspaceFormateur.trim() !== "") {
@@ -159,20 +169,18 @@ function updateEspaceFormateurButton(project) {
     btn.style.display = 'none';
   }
 }
-
-// Ouvre l'URL dans un nouvel onglet
 function openEspaceFormateur() {
   const project = projects[currentProjectId];
   if (project && project.urlEspaceFormateur) {
     window.open(project.urlEspaceFormateur, '_blank');
   }
 }
-function createNewProject() { const n=prompt("Nom de la formation :");if(!n)return;const c=prompt("Client :")||"Interne";const id='proj_'+Date.now();projects[id]={id,name:n,client:c,framing:{context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:''},phases:[]};saveData();renderWelcome();document.getElementById('welcomeProjectSelect').value=id; }
+function createNewProject() { const n=prompt("Nom de la formation :");if(!n)return;const c=prompt("Client :")||"Interne";const id='proj_'+Date.now();projects[id]={id,name:n,client:c,urlEspaceFormateur:'',framing:{context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:'',urlEspaceFormateur:''},phases:[]};saveData();renderWelcome();document.getElementById('welcomeProjectSelect').value=id; }
 function switchTab(t) { document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.view-section').forEach(v=>v.classList.remove('active'));document.getElementById('tab-'+t).classList.add('active');document.getElementById('view-'+t).classList.add('active');if(t==='framing')renderFraming();else if(t==='dashboard')renderDashboard();else if(t==='roadmap')renderRoadmap();else if(t==='kanban')renderKanban();else if(t==='checklist')renderChecklist(); }
 function togglePresentationMode() { document.body.classList.toggle('presentation-mode');if(document.body.classList.contains('presentation-mode')){const c=document.querySelector('.tab.active').id.replace('tab-','');if(c==='framing'&&!isFramingEditMode)switchTab('dashboard');if(isFramingEditMode){isFramingEditMode=false;renderFraming();}} }
 
 function renderFraming() {
-  const p=projects[currentProjectId],container=document.getElementById('framingContainer'),f=p.framing||{context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:''};
+  const p=projects[currentProjectId],container=document.getElementById('framingContainer'),f=p.framing||{context:'',objectives:'',thematic:'',participants:'',trainer:'',modality:'',urlEspaceFormateur:''};
   let html=`<div class="framing-header"><div><div class="framing-title">Fiche Formation</div><div class="framing-subtitle">Définition et périmètre de la formation</div></div>${!isFramingEditMode?`<button class="btn-action primary" onclick="toggleFramingEdit()"><i class="fas fa-pen"></i> Modifier</button>`:''}</div><div class="framing-grid">
     <div class="framing-block full-width"><div class="framing-label"><i class="fas fa-align-left"></i> Contexte & Public</div>${isFramingEditMode?`<textarea id="fContext" class="framing-textarea" rows="3">${f.context}</textarea>`:`<div class="framing-text ${!f.context?'empty':''}">${f.context||'Non renseigné'}</div>`}</div>
     <div class="framing-block"><div class="framing-label"><i class="fas fa-bullseye"></i> Objectifs Pédagogiques</div>${isFramingEditMode?`<textarea id="fObjectives" class="framing-textarea" rows="4">${f.objectives}</textarea>`:`<div class="framing-text ${!f.objectives?'empty':''}">${f.objectives||'Non renseigné'}</div>`}</div>
@@ -180,24 +188,25 @@ function renderFraming() {
     <div class="framing-block"><div class="framing-label"><i class="fas fa-users"></i> Participants</div>${isFramingEditMode?`<input type="text" id="fParticipants" class="framing-input" value="${f.participants}">`:`<div class="framing-text ${!f.participants?'empty':''}">${f.participants||'Non renseigné'}</div>`}</div>
     <div class="framing-block"><div class="framing-label"><i class="fas fa-chalkboard-user"></i> Formateur</div>${isFramingEditMode?`<input type="text" id="fTrainer" class="framing-input" value="${f.trainer}">`:`<div class="framing-text ${!f.trainer?'empty':''}">${f.trainer||'Non renseigné'}</div>`}</div>
     <div class="framing-block full-width"><div class="framing-label"><i class="fas fa-map-marker-alt"></i> Modalité</div>${isFramingEditMode?`<input type="text" id="fModality" class="framing-input" value="${f.modality}">`:`<div class="framing-text ${!f.modality?'empty':''}">${f.modality||'Non renseigné'}</div>`}</div>
-    </div>${isFramingEditMode?`<div class="framing-actions"><button class="btn-action" onclick="toggleFramingEdit()">Annuler</button><button class="btn-action primary" onclick="saveFraming()">Enregistrer</button></div>`:''}`;
-  container.innerHTML=html;
-      <div class="framing-block full-width">
+    
+    <!-- NOUVEAU CHAMP ICI -->
+    <div class="framing-block full-width">
       <div class="framing-label"><i class="fas fa-link"></i> Lien vers l'Espace Formateur (Vercel)</div>
       ${isFramingEditMode 
         ? `<input type="text" id="fUrlFormateur" class="framing-input" value="${f.urlEspaceFormateur || ''}" placeholder="https://...">` 
         : `<div class="framing-text ${!f.urlEspaceFormateur ? 'empty' : ''}">${f.urlEspaceFormateur || 'Non renseigné'}</div>`}
     </div>
+
+    </div>${isFramingEditMode?`<div class="framing-actions"><button class="btn-action" onclick="toggleFramingEdit()">Annuler</button><button class="btn-action primary" onclick="saveFraming()">Enregistrer</button></div>`:''}`;
+  container.innerHTML=html;
 }
 function toggleFramingEdit(){isFramingEditMode=!isFramingEditMode;renderFraming();}
 function saveFraming() {
   const p = projects[currentProjectId];
   
-  // On récupère la valeur du champ URL (s'il existe)
   const urlInput = document.getElementById('fUrlFormateur');
   const urlValue = urlInput ? urlInput.value : '';
 
-  // On sauvegarde tous les champs, y compris la nouvelle URL
   p.framing = {
     context: document.getElementById('fContext').value,
     objectives: document.getElementById('fObjectives').value,
@@ -205,16 +214,19 @@ function saveFraming() {
     participants: document.getElementById('fParticipants').value,
     trainer: document.getElementById('fTrainer').value,
     modality: document.getElementById('fModality').value,
-    urlEspaceFormateur: urlValue // <-- LA NOUVELLE LIGNE EST ICI
+    urlEspaceFormateur: urlValue 
   };
+  
+  // On met aussi à jour l'URL à la racine du projet pour le bouton
+  p.urlEspaceFormateur = urlValue;
 
   saveData();
   isFramingEditMode = false;
   renderFraming();
   
-  // NOUVEAU : On met à jour le bouton dans le header au cas où l'URL vient d'être changée
   updateEspaceFormateurButton(p); 
 }
+
 function renderDashboard() {
   const p=projects[currentProjectId];let total=0,done=0,doing=0,todo=0,all=[];p.phases.forEach(ph=>ph.tasks.forEach(t=>{total++;all.push(t);if(t.status==='done'||t.progress===100)done++;else if(t.status==='doing'||(t.progress>0&&t.progress<100))doing++;else todo++}));
   const pct=total===0?0:Math.round((done/total)*100);document.getElementById('dashProgVal').textContent=pct+'%';document.getElementById('dashProgBar').style.width=pct+'%';document.getElementById('dashProgTxt').textContent=`${done} tâche(s) terminée(s) sur ${total}`;document.getElementById('dashTodoCount').textContent=todo;document.getElementById('dashDoingCount').textContent=doing;document.getElementById('dashDoneCount').textContent=done;
