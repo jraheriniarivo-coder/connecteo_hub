@@ -88,8 +88,8 @@
     .kpi-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
     .kpi-value { font-size: 32px; font-weight: 800; color: var(--primary); line-height: 1; }
 
-    /* CHART */
-    .chart-container { background: var(--surface); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: 24px; height: 300px; display: flex; flex-direction: column; }
+    /* CHART (VUE BILAN) */
+    .chart-container { background: var(--surface); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border); height: 500px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm); }
     .chart-container h3 { font-family: var(--font-heading); font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--primary); }
     .chart-wrapper { flex: 1; position: relative; width: 100%; }
 
@@ -249,11 +249,11 @@
       <button class="year-btn" onclick="setYear(2027)">2027</button>
     </div>
 
-    <div class="workspace-label" id="sidebarLabel">Dashboard Global</div>
+    <div class="workspace-label" id="sidebarLabel">Navigation Globale</div>
     
     <nav class="nav" id="mainNav">
-      <!-- Rempli dynamiquement -->
-      <button class="nav-item active" onclick="showDashboard()"><i class="fas fa-chart-pie"></i> Vue d'ensemble</button>
+      <button class="nav-item active" id="nav-dashboard" onclick="showDashboard()"><i class="fas fa-chart-pie"></i> Vue d'ensemble</button>
+      <button class="nav-item" id="nav-bilan" onclick="showBilan()"><i class="fas fa-chart-bar"></i> Bilan de l'année</button>
     </nav>
 
     <div class="sidebar-bottom">
@@ -271,7 +271,7 @@
   <main class="main">
     <header class="topbar">
       <div class="breadcrumb">
-        <span>VOC</span> <span>/</span> <strong id="breadcrumbTitle">Dashboard Global</strong>
+        <span>VOC</span> <span>/</span> <strong id="breadcrumbTitle">Vue d'ensemble</strong>
       </div>
       <div class="top-actions" id="topActions">
         <!-- Rempli dynamiquement -->
@@ -315,14 +315,6 @@
             </div>
           </div>
 
-          <!-- GRAPHIQUE ANNUEL -->
-          <div class="chart-container">
-            <h3>Bilan de l'année</h3>
-            <div class="chart-wrapper">
-              <canvas id="yearlyChart"></canvas>
-            </div>
-          </div>
-
           <!-- CALENDRIER -->
           <div class="calendar-container">
             <div class="calendar-header">
@@ -352,6 +344,25 @@
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ==================== VUE BILAN ANNUEL ==================== -->
+      <div id="view-bilan" class="view-section">
+        <div class="container">
+          <div class="dashboard-header">
+            <div>
+              <h1 class="page-title">Bilan de l'année <span id="bilanYearLabel">2026</span></h1>
+              <p class="page-subtitle">Statistiques globales des tâches sur les 12 mois</p>
+            </div>
+          </div>
+          
+          <div class="chart-container">
+            <h3>Répartition des tâches par mois</h3>
+            <div class="chart-wrapper">
+              <canvas id="yearlyChart"></canvas>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -394,18 +405,38 @@ let isFramingEditMode = false;
 let currentYear = 2026;
 let selectedMonth = 0; // Janvier
 
-// Palette de couleurs pour les acteurs (Centralisée pour être réutilisée)
+// Palette de 20 couleurs ultra-distinctes (D3.js categorical)
 const ACTOR_COLORS = [
-  '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', 
-  '#ec4899', '#06b6d4', '#14b8a6', '#f97316', '#84cc16', 
-  '#6366f1', '#d946ef', '#f43f5e', '#0ea5e9', '#22c55e'
+  '#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', 
+  '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4',
+  '#469990', '#dcbeff', '#9A6324', '#fffac8', '#800000', 
+  '#aaffc3', '#808000', '#ffd8b1', '#000075', '#a9a9a9'
 ];
 
+// Mapping centralisé pour éviter les doublons
+let actorColorMap = {};
+
+function computeActorColors() {
+  const allActors = new Set();
+  Object.values(projects).forEach(proj => {
+    proj.phases.forEach(phase => {
+      phase.tasks.forEach(task => {
+        if (task.responsible && task.responsible.trim() !== '') allActors.add(task.responsible.trim());
+      });
+    });
+  });
+  
+  // Tri alphabétique pour garantir l'ordre et donc la stabilité des couleurs
+  const sortedActors = Array.from(allActors).sort();
+  
+  actorColorMap = {};
+  sortedActors.forEach((actor, index) => {
+    actorColorMap[actor] = ACTOR_COLORS[index % ACTOR_COLORS.length];
+  });
+}
+
 function getActorColor(actor) {
-  if (!actor) return '#cbd5e1';
-  let hash = 0;
-  for (let i = 0; i < actor.length; i++) hash = actor.charCodeAt(i) + ((hash << 5) - hash);
-  return ACTOR_COLORS[Math.abs(hash) % ACTOR_COLORS.length];
+  return actorColorMap[actor] || '#cbd5e1';
 }
 
 // ============ INIT ============
@@ -415,7 +446,6 @@ function init() {
     projects = JSON.parse(data);
     Object.values(projects).forEach(p => { if(!p.framing) p.framing = { context: '', objectives: '', budget: '', stakeholders: '', risks: '' }; });
   } else {
-    // Données de démo
     projects = { 
       'bred-2026': { 
         id: 'bred-2026', name: 'Enquêtes mystères BRED', client: 'BRED',
@@ -426,15 +456,6 @@ function init() {
             { id: 't2', name: 'Guide d\'évaluation', start: '2026-01-07', end: '2026-01-10', responsible: 'Consultant', progress: 50, status: 'doing', priority: 'high', isMilestone: false, deps: ['t1'] }
           ]}
         ] 
-      },
-      'pmo-2026': {
-        id: 'pmo-2026', name: 'Déploiement ERP', client: 'Direction Générale',
-        framing: { context: 'Déploiement', objectives: 'Migrer', budget: '250k', stakeholders: 'DSI', risks: 'Retard' },
-        phases: [
-          { id: 'p1', name: 'Cadrage', color: '#f59e0b', tasks: [
-            { id: 't1', name: 'Lancement', start: '2026-01-02', end: '2026-01-03', responsible: 'Directeur Projet', progress: 100, status: 'done', priority: 'high', isMilestone: true, deps: [] }
-          ]}
-        ]
       }
     };
     saveData();
@@ -453,10 +474,14 @@ function setYear(year) {
     b.classList.toggle('active', b.textContent === year.toString());
   });
   document.getElementById('currentYearLabel').textContent = year;
+  document.getElementById('bilanYearLabel').textContent = year;
+  
+  computeActorColors();
   
   if(document.getElementById('view-dashboard').classList.contains('active')) {
-    renderChart();
     renderDashboard();
+  } else if (document.getElementById('view-bilan').classList.contains('active')) {
+    renderChart();
   }
 }
 
@@ -497,15 +522,10 @@ function initMonthSelector() {
 }
 
 // ============ DASHBOARD GLOBAL ============
-let chartInstance = null;
-
 function renderDashboard() {
-  document.getElementById('sidebarLabel').textContent = 'Dashboard Global';
-  document.getElementById('breadcrumbTitle').textContent = 'Dashboard Global';
-  
-  document.getElementById('mainNav').innerHTML = `
-    <button class="nav-item active"><i class="fas fa-chart-pie"></i> Vue d'ensemble</button>
-  `;
+  document.getElementById('breadcrumbTitle').textContent = "Vue d'ensemble";
+  document.getElementById('nav-dashboard').classList.add('active');
+  document.getElementById('nav-bilan').classList.remove('active');
 
   let projectOptions = Object.values(projects).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   document.getElementById('topActions').innerHTML = `
@@ -535,7 +555,6 @@ function renderDashboard() {
   const currentFilter = actorFilter.value;
   actorFilter.innerHTML = '<option value="all">Tous les acteurs</option>';
   
-  // Tri des acteurs alphabétique
   const sortedActors = Array.from(allActors).sort();
   sortedActors.forEach(actor => {
     actorFilter.innerHTML += `<option value="${actor}">${actor}</option>`;
@@ -648,18 +667,15 @@ function renderCalendarOnly(providedTasks = null) {
     });
 
     dayTasks.forEach(t => {
-      // Couleur de fond selon l'acteur
       const actorColor = getActorColor(t.responsible);
       
       const bar = document.createElement('div');
       bar.className = 'cal-task';
       bar.style.backgroundColor = actorColor;
-      // Bordure gauche de la couleur du projet
       bar.style.borderLeft = `4px solid ${t.projectColor}`;
       bar.title = `Tâche: ${t.name}\nActeur: ${t.responsible || 'Non assigné'}\nProjet: ${t.projectName}`;
       bar.onclick = (e) => { e.stopPropagation(); openProject(t.projectId); };
       
-      // Contenu : Projet, acteur, tâche
       bar.innerHTML = `
         <div class="task-title">${t.name}</div>
         <div class="task-meta">${t.responsible || 'Non assigné'} • ${t.projectName}</div>
@@ -675,6 +691,22 @@ function renderCalendarOnly(providedTasks = null) {
   for (let i = 1; i <= remaining; i++) {
     grid.innerHTML += `<div class="day-cell other-month"><span class="day-num">${i}</span></div>`;
   }
+}
+
+// ============ VUE BILAN ============
+let chartInstance = null;
+
+function showBilan() {
+  document.getElementById('view-dashboard').classList.remove('active');
+  document.getElementById('view-bilan').classList.add('active');
+  document.getElementById('breadcrumbTitle').textContent = "Bilan de l'année";
+  
+  document.getElementById('nav-dashboard').classList.remove('active');
+  document.getElementById('nav-bilan').classList.add('active');
+
+  document.getElementById('topActions').innerHTML = ''; // Pas d'actions sur cette page
+  
+  renderChart();
 }
 
 function renderChart() {
@@ -725,14 +757,17 @@ function renderChart() {
 function openProject(id) {
   currentProjectId = id;
   document.getElementById('view-dashboard').classList.remove('active');
+  document.getElementById('view-bilan').classList.remove('active');
   document.getElementById('view-project').classList.add('active');
   
   const p = projects[currentProjectId];
   document.getElementById('breadcrumbTitle').textContent = p.name;
   
-  document.getElementById('sidebarLabel').textContent = 'Projet en cours';
+  document.getElementById('nav-dashboard').classList.remove('active');
+  document.getElementById('nav-bilan').classList.remove('active');
+
   document.getElementById('mainNav').innerHTML = `
-    <button class="nav-item" onclick="showDashboard()"><i class="fas fa-arrow-left"></i> Retour aux projets</button>
+    <button class="nav-item" onclick="showDashboard()"><i class="fas fa-arrow-left"></i> Retour à l'accueil</button>
   `;
 
   document.getElementById('topActions').innerHTML = `
@@ -746,7 +781,7 @@ function openProject(id) {
 }
 
 function switchProjectTab(tab) {
-  document.querySelectorAll('#view-project .btn').forEach(b => b.classList.remove('btn-primary'));
+  document.querySelectorAll('#view-project > div > .btn').forEach(b => b.classList.remove('btn-primary'));
   document.getElementById('tab-' + tab).classList.add('btn-primary');
   
   document.querySelectorAll('#view-project .view-section').forEach(v => v.classList.remove('active'));
@@ -760,7 +795,15 @@ function switchProjectTab(tab) {
 
 function showDashboard() {
   document.getElementById('view-project').classList.remove('active');
+  document.getElementById('view-bilan').classList.remove('active');
   document.getElementById('view-dashboard').classList.add('active');
+  
+  // Restaure la nav globale
+  document.getElementById('mainNav').innerHTML = `
+    <button class="nav-item active" id="nav-dashboard" onclick="showDashboard()"><i class="fas fa-chart-pie"></i> Vue d'ensemble</button>
+    <button class="nav-item" id="nav-bilan" onclick="showBilan()"><i class="fas fa-chart-bar"></i> Bilan de l'année</button>
+  `;
+  
   renderDashboard();
 }
 
@@ -769,8 +812,21 @@ function createNewProject() {
   if (!name) return;
   const client = prompt("Nom du client :") || "Client inconnu";
   const id = 'proj_' + Date.now();
-  projects[id] = { id: id, name: name, client: client, framing: { context: '', objectives: '', budget: '', stakeholders: '', risks: '' }, phases: [] };
+  
+  // Attribution automatique d'une couleur de phase par défaut au projet
+  const defaultColors = ['#0ea5e9', '#7c4dff', '#f59e0b', '#ec4899', '#10b981'];
+  const randomColor = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+
+  projects[id] = { 
+    id: id, 
+    name: name, 
+    client: client, 
+    framing: { context: '', objectives: '', budget: '', stakeholders: '', risks: '' }, 
+    phases: [{ id: 'p1', name: 'Phase 1', color: randomColor, tasks: [] }] 
+  };
+  
   saveData();
+  computeActorColors();
   openProject(id);
 }
 
@@ -871,10 +927,13 @@ function saveModal() {
     const name=document.getElementById('mPhaseName').value;if(!name){alert('Nom requis.');return}const cIn=document.querySelector('input[name="phaseColor"]:checked'),col=cIn?cIn.value:'#7c4dff';
     if(modalContext.type==='phase'){const ph=p.phases.find(x=>x.id===modalContext.phaseId);ph.name=name;ph.color=col}else{p.phases.push({id:'p_'+Date.now(),name,color:col,tasks:[]})}
   }
-  saveData();closeModal();switchProjectTab(document.querySelector('#view-project .btn-primary').id.replace('tab-',''));
+  saveData();
+  computeActorColors(); // Recalcule les couleurs si l'acteur est nouveau
+  closeModal();
+  switchProjectTab(document.querySelector('#view-project > div > .btn-primary').id.replace('tab-',''));
 }
 
-function deleteCurrentItem(){if(!confirm("Supprimer ?"))return;const p=projects[currentProjectId];if(modalContext.type==='task'){const ph=p.phases.find(x=>x.id===modalContext.phaseId);ph.tasks=ph.tasks.filter(t=>t.id!==modalContext.taskId);p.phases.forEach(ph2=>ph2.tasks.forEach(t=>{if(t.deps)t.deps=t.deps.filter(id=>id!==modalContext.taskId)}))}else if(modalContext.type==='phase'){p.phases=p.phases.filter(ph=>ph.id!==modalContext.phaseId)}saveData();closeModal();switchProjectTab(document.querySelector('#view-project .btn-primary').id.replace('tab-',''))}
+function deleteCurrentItem(){if(!confirm("Supprimer ?"))return;const p=projects[currentProjectId];if(modalContext.type==='task'){const ph=p.phases.find(x=>x.id===modalContext.phaseId);ph.tasks=ph.tasks.filter(t=>t.id!==modalContext.taskId);p.phases.forEach(ph2=>ph2.tasks.forEach(t=>{if(t.deps)t.deps=t.deps.filter(id=>id!==modalContext.taskId)}))}else if(modalContext.type==='phase'){p.phases=p.phases.filter(ph=>ph.id!==modalContext.phaseId)}saveData();closeModal();switchProjectTab(document.querySelector('#view-project > div > .btn-primary').id.replace('tab-',''))}
 
 function exportJSON(){const p=projects[currentProjectId],blob=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p.name.replace(/[^a-z0-9]/gi,'-').toLowerCase()+'.json';a.click();URL.revokeObjectURL(url)}
 
