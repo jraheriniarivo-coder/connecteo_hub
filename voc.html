@@ -95,24 +95,40 @@
 
     /* CALENDRIER */
     .calendar-container { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 24px; }
-    .calendar-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); background: #f8fafc; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); background: #f8fafc; flex-wrap: wrap; gap: 12px; }
     .calendar-header h3 { font-family: var(--font-heading); font-size: 18px; font-weight: 700; }
-    .filter-group { display: flex; align-items: center; gap: 12px; }
+    .filter-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     
+    /* LÉGENDE ACTEURS */
+    .legend-container { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; width: 100%; justify-content: flex-end; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); font-weight: 600; }
+    .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+
     .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-left: 1px solid var(--border); }
     .day-header { padding: 12px; text-align: center; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; background: #f8fafc; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
-    .day-cell { min-height: 120px; padding: 8px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--surface); position: relative; transition: background 0.2s; }
+    .day-cell { min-height: 140px; padding: 6px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--surface); position: relative; transition: background 0.2s; display: flex; flex-direction: column; gap: 4px; }
     .day-cell:hover { background: #fafafa; }
     .day-cell.other-month { background: #f8fafc; color: #cbd5e1; }
-    .day-num { font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: block; }
+    .day-num { font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 2px; display: block; }
     .day-cell.other-month .day-num { color: #cbd5e1; }
     
     /* TÂCHES DANS LE CALENDRIER */
-    .cal-task { font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform 0.1s; display: flex; align-items: center; gap: 4px; }
-    .cal-task:hover { transform: scale(1.02); z-index: 10; }
-    
-    /* COULEUR ACTEUR */
-    .actor-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .cal-task { 
+      font-size: 10px; 
+      padding: 4px 6px; 
+      border-radius: 4px; 
+      color: white; 
+      cursor: pointer; 
+      box-shadow: var(--shadow-sm); 
+      transition: transform 0.1s; 
+      display: flex; 
+      flex-direction: column;
+      line-height: 1.2;
+      overflow: hidden;
+    }
+    .cal-task:hover { transform: scale(1.02); z-index: 10; box-shadow: var(--shadow-md); }
+    .task-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .task-meta { font-size: 9px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; display: block;}
 
     /* MES PROJETS */
     .projects-section { margin-top: 32px; }
@@ -310,7 +326,12 @@
           <!-- CALENDRIER -->
           <div class="calendar-container">
             <div class="calendar-header">
-              <h3 id="calendarTitle">Calendrier</h3>
+              <div style="flex: 1;">
+                <h3 id="calendarTitle">Calendrier</h3>
+                <div class="legend-container" id="legendContainer">
+                  <!-- Légende des acteurs injectée ici -->
+                </div>
+              </div>
               <div class="filter-group">
                 <label style="font-size:13px; font-weight:600;">Filtrer par acteur :</label>
                 <select id="actorFilter" class="filter-select" onchange="renderCalendarOnly()">
@@ -373,6 +394,20 @@ let isFramingEditMode = false;
 let currentYear = 2026;
 let selectedMonth = 0; // Janvier
 
+// Palette de couleurs pour les acteurs (Centralisée pour être réutilisée)
+const ACTOR_COLORS = [
+  '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', 
+  '#ec4899', '#06b6d4', '#14b8a6', '#f97316', '#84cc16', 
+  '#6366f1', '#d946ef', '#f43f5e', '#0ea5e9', '#22c55e'
+];
+
+function getActorColor(actor) {
+  if (!actor) return '#cbd5e1';
+  let hash = 0;
+  for (let i = 0; i < actor.length; i++) hash = actor.charCodeAt(i) + ((hash << 5) - hash);
+  return ACTOR_COLORS[Math.abs(hash) % ACTOR_COLORS.length];
+}
+
 // ============ INIT ============
 function init() {
   const data = localStorage.getItem(STORAGE_KEY);
@@ -397,7 +432,7 @@ function init() {
         framing: { context: 'Déploiement', objectives: 'Migrer', budget: '250k', stakeholders: 'DSI', risks: 'Retard' },
         phases: [
           { id: 'p1', name: 'Cadrage', color: '#f59e0b', tasks: [
-            { id: 't1', name: 'Lancement', start: '2026-11-02', end: '2026-11-03', responsible: 'Directeur Projet', progress: 100, status: 'done', priority: 'high', isMilestone: true, deps: [] }
+            { id: 't1', name: 'Lancement', start: '2026-01-02', end: '2026-01-03', responsible: 'Directeur Projet', progress: 100, status: 'done', priority: 'high', isMilestone: true, deps: [] }
           ]}
         ]
       }
@@ -419,10 +454,9 @@ function setYear(year) {
   });
   document.getElementById('currentYearLabel').textContent = year;
   
-  // On ne met à jour le graphique que si on change d'année
   if(document.getElementById('view-dashboard').classList.contains('active')) {
     renderChart();
-    renderDashboard(); // Met à jour le reste
+    renderDashboard();
   }
 }
 
@@ -435,7 +469,6 @@ function initMonthSelector() {
     const btn = document.createElement('button');
     btn.className = `month-btn ${i === selectedMonth ? 'active' : ''}`;
     
-    // Compter les projets actifs ce mois
     const projectsInMonth = new Set();
     Object.values(projects).forEach(p => {
       p.phases.forEach(ph => ph.tasks.forEach(t => {
@@ -470,12 +503,10 @@ function renderDashboard() {
   document.getElementById('sidebarLabel').textContent = 'Dashboard Global';
   document.getElementById('breadcrumbTitle').textContent = 'Dashboard Global';
   
-  // Nav
   document.getElementById('mainNav').innerHTML = `
     <button class="nav-item active"><i class="fas fa-chart-pie"></i> Vue d'ensemble</button>
   `;
 
-  // Top Actions (Avec le bouton de sélection de projet !)
   let projectOptions = Object.values(projects).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   document.getElementById('topActions').innerHTML = `
     <select id="globalProjectSelect" class="filter-select" style="min-width: 200px;">
@@ -488,7 +519,6 @@ function renderDashboard() {
 
   initMonthSelector();
 
-  // Agrégation des données
   const allTasks = [];
   const allActors = new Set();
 
@@ -501,16 +531,29 @@ function renderDashboard() {
     });
   });
 
-  // Filtre acteurs
   const actorFilter = document.getElementById('actorFilter');
   const currentFilter = actorFilter.value;
   actorFilter.innerHTML = '<option value="all">Tous les acteurs</option>';
-  Array.from(allActors).sort().forEach(actor => {
+  
+  // Tri des acteurs alphabétique
+  const sortedActors = Array.from(allActors).sort();
+  sortedActors.forEach(actor => {
     actorFilter.innerHTML += `<option value="${actor}">${actor}</option>`;
   });
   actorFilter.value = currentFilter;
 
-  // Filtrage pour le mois en cours
+  // LÉGENDE ACTEURS
+  const legend = document.getElementById('legendContainer');
+  legend.innerHTML = '';
+  sortedActors.forEach(actor => {
+    legend.innerHTML += `
+      <div class="legend-item">
+        <div class="legend-color" style="background:${getActorColor(actor)}"></div>
+        <span>${actor}</span>
+      </div>
+    `;
+  });
+
   const monthTasks = allTasks.filter(t => {
     const s = new Date(t.start); const e = new Date(t.end);
     const firstDay = new Date(currentYear, selectedMonth, 1);
@@ -518,16 +561,12 @@ function renderDashboard() {
     return (s <= lastDay && e >= firstDay);
   });
 
-  // KPIs
   document.getElementById('kpiTotalProjets').textContent = Object.keys(projects).length;
   document.getElementById('kpiTasksMonth').textContent = monthTasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').length;
   document.getElementById('kpiCancelled').textContent = monthTasks.filter(t => t.status === 'cancelled').length;
   document.getElementById('kpiActors').textContent = new Set(monthTasks.map(t => t.responsible).filter(Boolean)).size;
 
-  // Rendu Calendrier
   renderCalendarOnly(monthTasks);
-  
-  // Rendu Liste Projets
   renderProjectsList();
 }
 
@@ -550,14 +589,6 @@ function renderProjectsList() {
     `;
     grid.appendChild(card);
   });
-}
-
-function getActorColor(actor) {
-  if (!actor) return '#cbd5e1';
-  let hash = 0;
-  for (let i = 0; i < actor.length; i++) hash = actor.charCodeAt(i) + ((hash << 5) - hash);
-  const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
-  return colors[Math.abs(hash) % colors.length];
 }
 
 function renderCalendarOnly(providedTasks = null) {
@@ -607,7 +638,6 @@ function renderCalendarOnly(providedTasks = null) {
     const currentDateStr = `${currentYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
     const dayTasks = tasksToRender.filter(t => {
-      // Filtre acteur
       if (actorFilterVal !== 'all' && t.responsible !== actorFilterVal) return false;
 
       const s = new Date(t.start); const e = new Date(t.end);
@@ -618,15 +648,22 @@ function renderCalendarOnly(providedTasks = null) {
     });
 
     dayTasks.forEach(t => {
+      // Couleur de fond selon l'acteur
       const actorColor = getActorColor(t.responsible);
+      
       const bar = document.createElement('div');
       bar.className = 'cal-task';
-      bar.style.backgroundColor = t.projectColor;
-      bar.style.borderLeft = `3px solid ${actorColor}`;
-      bar.title = `${t.name} (${t.responsible || 'Non assigné'})`;
+      bar.style.backgroundColor = actorColor;
+      // Bordure gauche de la couleur du projet
+      bar.style.borderLeft = `4px solid ${t.projectColor}`;
+      bar.title = `Tâche: ${t.name}\nActeur: ${t.responsible || 'Non assigné'}\nProjet: ${t.projectName}`;
       bar.onclick = (e) => { e.stopPropagation(); openProject(t.projectId); };
       
-      bar.innerHTML = `<span class="actor-dot" style="background:${actorColor}"></span> ${t.name}`;
+      // Contenu : Projet, acteur, tâche
+      bar.innerHTML = `
+        <div class="task-title">${t.name}</div>
+        <div class="task-meta">${t.responsible || 'Non assigné'} • ${t.projectName}</div>
+      `;
       cell.appendChild(bar);
     });
 
@@ -734,7 +771,7 @@ function createNewProject() {
   const id = 'proj_' + Date.now();
   projects[id] = { id: id, name: name, client: client, framing: { context: '', objectives: '', budget: '', stakeholders: '', risks: '' }, phases: [] };
   saveData();
-  openProject(id); // Ouvre directement le projet
+  openProject(id);
 }
 
 // ============ LOGIQUE PROJET (Roadmap, Kanban, etc.) ============
