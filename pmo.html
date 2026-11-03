@@ -503,10 +503,29 @@ function renderDashboard() {
 function openProjectFromSelect() { const id = document.getElementById('globalProjectSelect').value; if (id) openProject(id); }
 
 function renderProjectsList() {
-  const grid = document.getElementById('projectsGrid'); grid.innerHTML = '';
+  const grid = document.getElementById('projectsGrid'); 
+  grid.innerHTML = '';
+  
+  if (Object.keys(projects).length === 0) {
+    grid.innerHTML = '<div style="color:var(--text-muted); font-size:14px;">Aucun projet pour le moment.</div>';
+    return;
+  }
+
   Object.values(projects).forEach(p => {
-    const card = document.createElement('div'); card.className = 'project-card';
-    card.innerHTML = `<h4>${p.name}</h4><p>${p.client}</p><button class="btn btn-primary" onclick="openProject('${p.id}')">Ouvrir <i class="fas fa-arrow-right"></i></button>`;
+    const card = document.createElement('div'); 
+    card.className = 'project-card';
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h4>${p.name}</h4>
+          <p>${p.client}</p>
+        </div>
+        <button class="btn" style="padding: 6px; color: var(--danger); border-color: transparent;" onclick="event.stopPropagation(); deleteProject('${p.id}')" title="Supprimer le projet">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      <button class="btn btn-primary" style="margin-top: auto;" onclick="openProject('${p.id}')">Ouvrir <i class="fas fa-arrow-right"></i></button>
+    `;
     grid.appendChild(card);
   });
 }
@@ -583,13 +602,19 @@ function renderChart() {
 
 function openProject(id) {
   currentProjectId = id;
-  document.getElementById('view-dashboard').classList.remove('active'); document.getElementById('view-bilan').classList.remove('active'); document.getElementById('view-project').classList.add('active');
+  document.getElementById('view-dashboard').classList.remove('active'); document.getElementById('view-bilan').classList.remove('active'); 
+  document.getElementById('view-project').classList.add('active');
+
   const p = projects[currentProjectId];
   document.getElementById('breadcrumbTitle').textContent = p.name;
-  document.getElementById('nav-dashboard').classList.remove('active'); document.getElementById('nav-bilan').classList.remove('active');
-  document.getElementById('mainNav').innerHTML = `<button class="nav-item" onclick="showDashboard()"><i class="fas fa-arrow-left"></i> Retour à l'accueil</button>`;
+
+  document.getElementById('nav-dashboard').classList.remove('active'); 
+  document.getElementById('nav-bilan').classList.remove('active');
+  document.getElementById('mainNav').innerHTML = `<button class="nav-item" onclick="showDashboard
+  ()"><i class="fas fa-arrow-left"></i> Retour à l'accueil</button>`;
   
   document.getElementById('topActions').innerHTML = `
+      <button class="btn" style="color: var(--danger); border-color: #fecaca;" onclick="deleteProject('${p.id}')" title="Supprimer le projet"><i class="fas fa-trash"></i></button>
     <button class="btn" onclick="exportJSON()"><i class="fas fa-download"></i> Export</button>
     <button class="btn btn-primary" onclick="openNewTaskModal()" style="background:var(--primary); border-color:var(--primary);"><i class="fas fa-plus"></i> Tâche</button>
     <button class="btn btn-primary" onclick="openNewPhaseModal()"><i class="fas fa-plus"></i> Phase</button>
@@ -716,6 +741,18 @@ function deleteCurrentItem(){if(!confirm("Supprimer ?"))return;const p=projects[
 function exportJSON(){const p=projects[currentProjectId],blob=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p.name.replace(/[^a-z0-9]/gi,'-').toLowerCase()+'.json';a.click();URL.revokeObjectURL(url)}
 
 window.addEventListener('resize',()=>{if(document.getElementById('view-project').classList.contains('active')&&document.getElementById('proj-view-roadmap').classList.contains('active')){drawDependencies(projects[currentProjectId])}});
+
+function deleteProject(projectId) {
+  const p = projects[projectId];
+  if (!p) return;
+  
+  if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement le projet "${p.name}" ?\nToutes les tâches associées seront perdues.`)) {
+    delete projects[projectId];
+    saveData();
+    computeActorColors(); // Recalcule les couleurs car des acteurs peuvent disparaître
+    showDashboard();      // Retourne à l'accueil
+  }
+}
 
 init();
 </script>
